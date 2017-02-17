@@ -1,0 +1,21 @@
+stages:
+  - build
+  - deploy
+
+build:
+  stage: build
+  script:
+    - ./gradlew build
+  tags:
+    - linux
+    - java
+
+deploy:
+  stage: deploy
+  script:
+    - ./gradlew publishToWebServer
+  tags:
+    - linux
+    - java
+  only:
+    - tags

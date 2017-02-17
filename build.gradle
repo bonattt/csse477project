@@ -1,0 +1,90 @@
+plugins {
+	id 'org.hidetake.ssh' version '2.7.0'
+}
+
+apply plugin: 'java'
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+apply plugin: 'application'
+
+mainClassName = "app.SimpleWebServer"
+
+repositories {
+	jcenter()
+    maven {
+        url "https://maven.csse.rose-hulman.edu/artifactory/student-release-local"
+    }
+}
+
+dependencies {
+	compile 'org.apache.logging.log4j:log4j-api:2.+'
+	compile 'org.apache.logging.log4j:log4j-core:2.+'
+	testCompile 'junit:junit:4.+'
+	testCompile 'org.mockito:mockito-core:1.+'
+}
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+group = "edu.rosehulman.csse477.bonattt.sws"
+
+if (System.getenv("CI_BUILD_TAG") != null) {
+    version = "${System.getenv("CI_BUILD_TAG")}"
+} else {
+    version = '1.0.1-SNAPSHOT'
+}
+
+
+jar {
+    manifest {
+        attributes "Implementation-Title": "Thomas' Web-App Server",
+            "Implementation-Version": "${version}"
+    }
+}
+
+
+// SSH Publishing
+ssh.settings { knownHosts = allowAnyHosts }
+
+remotes {
+	webServer {
+		host = '477-22.csse.rose-hulman.edu'
+		user = System.getenv('SSH_USER')
+		password = System.getenv('SSH_PASSWORD')
+	}
+}
+
+task publishToWebServer(dependsOn: distZip) << {
+	ssh.run {
+		session(remotes.webServer) {
+			println "Checking if remote /tmp/rosecalculator exists ..."
+
+			def result = execute('if test -d /tmp/rosecalculator; then echo "exists"; fi')						
+			if(result != "exists") {
+				println("Remote /tmp/rosecalculator does not exist, creating a new one...")
+				execute('mkdir -p /tmp/rosecalculator')
+				println("Remote /tmp/rosecalculator created!")
+			}
+
+			println "Transfering file from local build/distributions to remote /tmp/rosecalculator ..."
+			put from: "${buildDir}/distributions/*", into: '/tmp/rosecalculator'
+			println "Files transfer complete now setting up the web server ..."
+			
+			println "Checking if remote /var/www/html/rosecalculator exists ..."
+			result = execute('if test -d /var/www/html/rosecalculator; then echo "exists"; fi')
+			if(result != "exists") {
+				println("Remote /var/www/html/rosecalculator does not exist, creating a new one...")
+				executeSudo('mkdir -p /var/www/html/rosecalculator', pty: true)
+				println("Remote /var/www/html/rosecalculator created!")
+			}
+
+			println "Copying data from the temp folder to the web folder ..."
+			executeSudo('cp /tmp/rosecalculator/* /var/www/html/rosecalculator', pty: true)
+
+			println "Done! Clearing the tmp folder ..."
+			execute('rm -rf /tmp/rosecalculator')
+			println "All done!" 
+			println "Rosecalcultor has been deployed to http://477-01.csse.rose-hulman.edu/rosecalculator/"
+		}
+	}
+}

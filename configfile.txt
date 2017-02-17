@@ -1,0 +1,4 @@
+root = web
+port = 8080
+name = TomSWS
+version = 1.0.0
