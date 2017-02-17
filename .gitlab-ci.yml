@@ -5,17 +5,19 @@ stages:
 build:
   stage: build
   script:
-    - ./gradlew build
+    - gradle build
   tags:
     - linux
     - java
+    - gradle
 
 deploy:
   stage: deploy
   script:
-    - ./gradlew publishToWebServer
+    - gradle publishToWebServer
   tags:
     - linux
     - java
+    - gradle
   only:
     - tags
