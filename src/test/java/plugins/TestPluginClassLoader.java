@@ -20,7 +20,7 @@ public class TestPluginClassLoader {
  
 	private Logger logger = LogManager.getLogger(this.getClass());
 	private PluginClassLoader loader;
-	
+	     
 //	@Before
 //	public void setup() throws IOException {
 //		loader = new PluginClassLoader();
