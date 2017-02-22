@@ -19,7 +19,6 @@ import protocol.HttpResponse;
 import protocol.HttpResponseFactory;
 import protocol.Protocol;
 import protocol.ProtocolException;
-import reqHandlers.GetHandler;
 
 /**
  * This class is responsible for handling a incoming request
