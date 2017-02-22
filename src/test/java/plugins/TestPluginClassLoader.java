@@ -24,7 +24,7 @@ public class TestPluginClassLoader {
 	@Before
 	public void setup() throws IOException {
 		loader = new PluginClassLoader();
-		loader.setJarFile("lib/EchoPlugin.jar");
+		loader.setJarFile("testFiles/testPlugins/EchoPlugin.jar");
 		loader.loadAllClasses();
 	}
 	

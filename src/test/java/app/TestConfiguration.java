@@ -19,7 +19,7 @@ public class TestConfiguration {
 
 	@Test
 	public void testRootFile1() throws IOException {
-		String expected = "./web";
+		String expected = "web";
 		System.out.println(config.get("root"));
 		assertEquals(expected, config.get("root"));
 	}

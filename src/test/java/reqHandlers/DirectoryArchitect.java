@@ -23,50 +23,81 @@ class DirectoryArchitect {
 	
 	public DirectoryArchitect(String root) {
 		this.root = root;
-		this.logger = logger;
 		logger.info("Root: " + root);
 	}
 	
 	public boolean verifyDirectoryFile() {
+		logger.info("dir-file path: " + root + DIR_PATH);
 		File dirFile = new File(root + DIR_PATH);
-		logger.info(root + DIR_PATH);
 		if (dirFile.exists()) {
-			return dirFile.isDirectory();
+			logger.info("file exists");
+			if (dirFile.isDirectory()) {
+				logger.info("file is already a directory");
+				return true;
+			} else {
+				logger.info("file is not a directory");
+				dirFile.delete();
+			}
 		}
-		else {
-			return false;
-		}
+		logger.info("file does not exist");
+		return createDir(dirFile);
 	}
 
-	public boolean verifyTestFile() throws IOException {
+	private boolean createDir(File dirFile) {
+		if (dirFile.mkdirs()) {
+			logger.info("successfully replaced file with new directory");
+			return true;
+		}
+		logger.error("failed to replace file with new directory");
+		return false;
+	}
+	
+	public boolean verifyTestFile() {
+		logger.info("exists-file path: " + root + FILE_PATH);
 		boolean append = false;
 		File txtFile = new File(root + FILE_PATH);
-		logger.info(root + FILE_PATH);
 		if (txtFile.exists()) {
 			if (txtFile.isDirectory()) {
-				return false;
+				logger.info("file exists, trying to delete it.");
+				try {
+					txtFile.delete();
+					txtFile.createNewFile();
+				} catch (IOException e) {
+					logger.error("failed to replace dir with new file.");
+					return false;
+				}
 			}
 		}
 		else {
-			txtFile.createNewFile();
+			try {
+				txtFile.createNewFile();
+			} catch (IOException e) {
+				logger.error("failed to create a new file");
+				return false;
+			}
 		}
 		StringBuilder msg = new StringBuilder();
 		msg.append(FIRST_LINE);
 		msg.append('\n');
 		msg.append(LAST_LINE);
 		msg.append('\n');
-		FileWriter writer = new FileWriter(txtFile, append);
-		writer.write(msg.toString());
-		writer.close();
+		try {
+			FileWriter writer = new FileWriter(txtFile, append);
+			writer.write(msg.toString());
+			writer.close();
+		} catch (IOException e) { 
+			logger.error("failed to write to file.");
+			return false;
+		}
 		return true;
 	}
 	
 	public boolean verifyNoFile() {
+		logger.info("no-file path: " + root + NONE_PATH);
 		File file = new File(root + NONE_PATH); 
-		logger.info(root + NONE_PATH);
 		if (file.exists()) {
 			file.delete();
-		}		
+		}
 		return true;
 	}
 
