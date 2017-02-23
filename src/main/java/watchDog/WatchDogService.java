@@ -18,13 +18,14 @@ import com.rabbitmq.client.Consumer;
 import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
 
-public class WatchDogServer implements Runnable {
+public class WatchDogService implements Runnable {
 
 	private static final int WAIT_TIME = 100;
 	private static final int DEFAULT_TICKS = 100;
+	private static final byte[] DEFAULT_CODE = new byte[]{'a', 'b', 'c', 1, 2, 3};
 
 	private int count, maxCount; 
-	private String notifiedQueue, watchedQueue;
+	private String notificationQueue, watchedQueue;
 	private boolean keepRunning;
 
 	private Channel notifiedChannel, watchedChannel;
@@ -33,18 +34,22 @@ public class WatchDogServer implements Runnable {
 	private String message;
 	private boolean messageReceived;
 	
+	private byte[] notificationCode;
+	
 	private Logger logger = LogManager.getLogger(this.getClass());
 	
-	public WatchDogServer(String notifiedQueue, String watchedQueue)
+	public WatchDogService(String notifiedQueue, String watchedQueue)
 				throws IOException, TimeoutException {
 		this(notifiedQueue, watchedQueue, WAIT_TIME * DEFAULT_TICKS);
 	}
 	
-	protected WatchDogServer(String notifyQueue, String checkQueue, int milis) 
+	protected WatchDogService(String notifyQueue, String checkQueue, int milis) 
 				throws IOException, TimeoutException {
-		this.notifiedQueue = notifyQueue;
+		this.notificationQueue = notifyQueue;
 		this.watchedQueue = checkQueue;
-		keepRunning = true;
+		this.notificationCode = DEFAULT_CODE;
+		this.keepRunning = true;
+		
 		setTimeLimit(milis);
 		setupWatchedQueue();
 		try {
@@ -55,42 +60,19 @@ public class WatchDogServer implements Runnable {
 		}
 	}
 	
+	public void setNotificationCode(byte[] newCode) {
+		notificationCode = newCode;
+	}
+	
 	private void setupWatchedQueue() throws IOException, TimeoutException {
 		logger.info("setting up watched queue + '" + watchedQueue + "'");
-		try {
-			ConnectionFactory factory = new ConnectionFactory();
-		    factory.setHost("localhost");
-		    watchedConnection = factory.newConnection();
-		    watchedChannel = watchedConnection.createChannel();
-//		    watchedChannel.queueDeclare(watchedQueue, false, false, false, null);
-		    logger.info("successfully declared queue '" + watchedQueue + "'");
-		} catch (IOException e) {
-			logger.info("IOException: " + e.getMessage());
-		}
+		logger.warn("this method is not implemented yet");
 	}
 	
 	private void setupNotifiedQueue() throws IOException, TimeoutException {
-		logger.info("setting up notified queue: '" + notifiedQueue + "'");
-		ConnectionFactory factory = new ConnectionFactory();
-	    factory.setHost("localhost");
-	    notifiedConnection = factory.newConnection();
-	    notifiedChannel = notifiedConnection.createChannel();
-
-//	    notifiedChannel.queueDeclare(notifiedQueue, false, false, false, null);
-
-	    Consumer consumer = new DefaultConsumer(notifiedChannel) {
-	      @Override
-	      public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body)
-	          throws IOException {
-	    	logger.info("received a message!");
-	        message = new String(body, "UTF-8");
-	        logger.info(String.format("received message '%s'", message));
-	        reset();
-	        logger.info("finished handling message '" + message + "'");
-	      }
-	    };
-	    notifiedChannel.basicConsume(notifiedQueue, true, consumer);
-		logger.info("notified queue: '" + notifiedQueue + "' is now consuming messages.");
+		logger.info("setting up notified queue: '" + notificationQueue + "'");
+		logger.warn("this method is not implemented yet");
+		logger.info("notified queue: '" + notificationQueue + "' is now consuming messages.");
 	}
 	
 	@Override
@@ -108,7 +90,10 @@ public class WatchDogServer implements Runnable {
 			tick();
 		}
 		logger.info("WatchDogServer finished");
+//		closeAll();
+	}
 
+	private void closeAll() {
 		try {
 			notifiedChannel.close();
 		} catch (Exception e) {
@@ -136,6 +121,7 @@ public class WatchDogServer implements Runnable {
 			logger.warn("Exception thrown closing watchedConnection");
 			logger.info(e + " : msg = " + e.getMessage());
 		}
+		logger.info("closed connections and channels.");
 	}
 	
 	public boolean isTimedOut() {
@@ -165,8 +151,16 @@ public class WatchDogServer implements Runnable {
 	}
 	
 	public void notifyApp() {
-		logger.info("notifying queue " + notifiedQueue);
-		
+		logger.info("notifying queue " + notificationQueue);
+	    logger.info(String.format("sending code %s", notificationCode));
+//	    try {
+////			notifiedChannel.basicPublish("", notificationQueue, null, notificationCode);
+//		} catch (IOException e) {
+//			logger.error("Failed to send notification in queue '" + notificationQueue + "'");
+//			logger.error("IO Exception: " + e.getMessage());
+//		} catch (Exception e) {
+//			logger.error("error: " + e.getMessage());
+//		}
 	}
 	
 	public boolean checkForMessages() {
