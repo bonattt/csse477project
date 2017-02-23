@@ -26,6 +26,8 @@ import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
 import com.rabbitmq.client.MessageProperties;
 
+import loadBalancing.LoadBalancer;
+
 public class TestLoadBalancer {
 
 	protected static final String CONNECTION_QUEUE_NAME = "TomSWS_connectionQueue";
@@ -79,47 +81,11 @@ public class TestLoadBalancer {
 		msg_connection.close();
 	}
 	
-	@Test
-	public void forwardConnectionIncrementsConnectionNumber()
-				throws NoSuchFieldException, SecurityException,
-					IllegalArgumentException, IllegalAccessException, IOException {
-		
-		Field f = balancer.getClass().getDeclaredField("connectionNumber");
-		f.setAccessible(true);
-		int initial = f.getInt(balancer);
-		balancer.forwardConnection(sock_connection);
-		assertEquals(initial+1, f.get(balancer));
-	}
 
 	@Test(timeout=1000)
 	public void runExitsForStop() {
 		balancer.stop();
 		balancer.run();
-	}
-	
-	@Test(timeout=2000)
-	public void forwardConnectionSendsMessage() throws IOException {
-		balancer.forwardConnection(sock_connection);
-		logger.info("message sent");
-		
-		while(waitForMessage) {
-			// busy wait
-		}
-		logger.info("loop exited");
-		// nothing, the message was received.		
-	}
-	
-	@Test(timeout=2000)
-	public void testMessageIsCorrect() throws IOException {
-		balancer.forwardConnection(sock_connection);
-		logger.info("message sent");
-		
-		while(waitForMessage) {
-			// busy wait
-		}
-		logger.info("loop exited");
-		String expected = "";
-		assertEquals(expected, this.message);
 	}
 	
 }

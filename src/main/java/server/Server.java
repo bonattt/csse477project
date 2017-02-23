@@ -57,6 +57,7 @@ public class Server implements IServer {
 	private ServerSocket welcomeSocket;
 	private Logger logger = LogManager.getLogger(this.getClass());
 	private int connectionNumber = 1;
+	private boolean loadBalanceMode;
 	
 	private Map<String, IServlet> servletsLoaded;
 	private Map<String, Class<? extends IServlet>> servletClasses;
@@ -66,9 +67,15 @@ public class Server implements IServer {
 	 * @param port
 	 */
 	public Server(String rootDirectory, int port) {
+		this(rootDirectory, port, false);	
+	}
+	
+	public Server(String rootDirectory, int port, boolean loadBalanceMode) {
 		this.rootDirectory = rootDirectory;
 		this.port = port;
 		this.stop = new AtomicBoolean(false);
+		
+		this.loadBalanceMode = loadBalanceMode;
 		
 		servletsLoaded = new HashMap<>();
 		servletClasses = new ConcurrentHashMap<>();
@@ -141,6 +148,14 @@ public class Server implements IServer {
 	 * the request.
 	 */
 	public void run() {
+		if (loadBalanceMode) {
+			// TODO
+		} else { 		
+			runNormalMode();
+		}
+	}
+	
+	private void runNormalMode() {
 		try {
 			this.welcomeSocket = new ServerSocket(port);
 			

@@ -16,7 +16,7 @@ import server.Server;
  * The entry point of the Simple Web Server (SWS).
  * 
  * @author Chandan R. Rupakheti (rupakhet@rose-hulman.edu)
- * @author Thoams Bonatti (bonattt@rose-hulman.edu)
+ * @author Thomas Bonatti (bonattt@rose-hulman.edu)
  */
 public class SimpleWebServer {
 	
