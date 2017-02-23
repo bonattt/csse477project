@@ -125,16 +125,17 @@ public class PluginMonitor implements Runnable {
 		logger.info("starting PluginMonitor");
 		
 		do {
-			logger.info("monitoring...");
+//			logger.info("monitoring...");
 			WatchKey newKey;
+			newKey = watcher.poll();
+			if (newKey == null) {
+				continue;
+			}
+			handleChange(newKey);
+			logger.info("finished handling change");
 			try {
-				newKey = watcher.take();
-				handleChange(newKey);
-				logger.info("finished handling change");
-			} catch (InterruptedException e) {
-				logger.error("interrupt exception while trying to get watch directory.\n\t" +
-							e.getMessage());
-			}		
+				Thread.sleep(250);
+			} catch (InterruptedException e) {/*do nothing*/} 
 		} while(keepWatching.get());
 		// This is for testing purposes, so the loop can be run a single time outside a thread
 		logger.info("exiting PluginMonitor run method");

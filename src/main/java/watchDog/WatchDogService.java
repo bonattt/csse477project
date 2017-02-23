@@ -91,14 +91,14 @@ public class WatchDogService implements Runnable {
 	
 	private void setupNotifiedQueue() throws IOException, TimeoutException {
 		logger.info("setting up notified queue: '" + notificationQueue + "'");
+		
 		ConnectionFactory factory = new ConnectionFactory();
 		factory.setHost("localhost");
+		
 		notifiedConnection = factory.newConnection();
 		notificationChannel = notifiedConnection.createChannel();
 		notificationChannel.exchangeDeclare(exchangeName, "fanout");
-		
 		notificationChannel.queueBind(notificationQueue, exchangeName, "");
-		
 		
 		logger.info("notified queue: '" + notificationQueue + "' is now ready.");
 	}

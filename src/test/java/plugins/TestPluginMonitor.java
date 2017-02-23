@@ -60,17 +60,17 @@ public class TestPluginMonitor {
 		logger.info("cleanup complete.");
 	}
 	
-//	@Test
-//	public void testThreadStops() {
-//		thread.start();
-//		mon.stop();
-//		try {
-//			thread.join();
-//		} catch (InterruptedException e) {
-//			assertFalse(thread.isAlive());
-//		}
-//	
-//	}
+	@Test //(timeout=2000)
+	public void testThreadStops() {
+		thread.start();
+		mon.stop();
+		try {
+			thread.join();
+		} catch (InterruptedException e) {
+			assertFalse(thread.isAlive());
+		}
+	
+	}
 
 /*	@Test
 	public void testThreadStarts() {
@@ -86,6 +86,7 @@ public class TestPluginMonitor {
 		assertTrue(mon.getNextFile().equals(NEW_FILE));
 		mon.stop();
 	}
+	
 
 //	@Test
 //	public void testDetectsNewFileThreaded() throws IOException {

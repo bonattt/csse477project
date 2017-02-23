@@ -81,6 +81,7 @@ public class TestWatchDogServer {
 		watchedChannel = watchedConnection.createChannel();
 		watchedChannel.exchangeDeclare(EXCHANGE_NAME, "fanout");
 		watchedQueue = watchedChannel.queueDeclare().getQueue();
+		
 	}
 	
 	private static void setupNotifiedQueue() throws IOException, TimeoutException {
