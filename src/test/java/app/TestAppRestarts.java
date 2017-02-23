@@ -214,7 +214,7 @@ public class TestAppRestarts {
 		server.startApp();
 
 		
-		String exchange = WatchDogService.WATCH_DOG_EXCHANGE;
+		String exchange = WatchDogService.WATCHING_EXCHANGE;
 		String key = "correct key";
 		server.setRestartKey(key.getBytes());
 		
@@ -248,7 +248,7 @@ public class TestAppRestarts {
 		f.setAccessible(true);
 		thread3 = (Thread) f.get(server);
 		
-		String exchange = WatchDogService.WATCH_DOG_EXCHANGE;
+		String exchange = WatchDogService.WATCHING_EXCHANGE;
 		String goodKey = "incorrect key";
 		server.setRestartKey(goodKey.getBytes());
 		String badKey = "correct key";

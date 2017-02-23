@@ -21,18 +21,20 @@ import com.rabbitmq.client.Envelope;
 
 public class WatchDogService implements Runnable {
 
-	public static final String WATCH_DOG_EXCHANGE = "watchDogExchange";
+	public static final String WATCHING_EXCHANGE = "watchDogWatching";
+	public static final String NOTIFYING_EXCHANGE = "WatchDogNotifying";
 	
 	private static final int WAIT_TIME = 100;
 	private static final int DEFAULT_TICKS = 100;
 	private static final byte[] DEFAULT_CODE = new byte[]{'a', 'b', 'c', 1, 2, 3};
 
 	private int count, maxCount; 
-	private String notificationQueue, watchedQueue, exchangeName;
+//	notificationQueue, watchedQueue,
+	private String  watchedExchange, notifierExchange;
 	private boolean keepRunning;
 
 	private Channel notificationChannel, watchedChannel;
-	private Connection notifiedConnection, watchedConnection;
+	private Connection notifierConnection, watchedConnection;
 	
 	private String lastMessage;
 	
@@ -40,43 +42,44 @@ public class WatchDogService implements Runnable {
 	
 	private Logger logger = LogManager.getLogger(this.getClass());
 	
-	public WatchDogService(String notifiedQueue, String watchedQueue, String exchangeName)
+	public WatchDogService(String exchangeName, String notifierExch)
 				throws IOException, TimeoutException {
-		this(notifiedQueue, watchedQueue, exchangeName, WAIT_TIME * DEFAULT_TICKS);
+		this(exchangeName, notifierExch, WAIT_TIME * DEFAULT_TICKS);
 	}
 	
-	protected WatchDogService(String notifyQueue, String checkQueue, String exchangeName, int milis) 
+	protected WatchDogService(String exchangeName, String notifierExch, int milis) 
 				throws IOException, TimeoutException {
-		this.notificationQueue = notifyQueue;
-		this.watchedQueue = checkQueue;
-		this.exchangeName = exchangeName;
+//		this.notificationQueue = notifyQueue;
+//		this.watchedQueue = checkQueue;
+		this.watchedExchange = exchangeName;
+		this.notifierExchange = notifierExch;
 		this.notificationCode = DEFAULT_CODE;
 		this.keepRunning = true;
 		
 		setTimeLimit(milis);
-		setupWatchedQueue();
-		try {
-			setupNotifiedQueue();
-		} catch (IOException e) {
-			logger.error("IOExcetpion: " + e.getMessage());
-//			throw e;
-		}
+//		setupWatchedQueue();
+//		setupNotifiedQueue();
 	}
 	
 	public void setNotificationCode(byte[] newCode) {
 		notificationCode = newCode;
 	}
 	
-	private void setupWatchedQueue() throws IOException, TimeoutException {
-		logger.info("setting up watched queue + '" + watchedQueue + "'");
+	public byte[] getNotificationCode() {
+		return notificationCode;
+	}
+	
+	public void setupWatchedQueue() throws IOException, TimeoutException {
+		logger.info("setting up watched queue");
 		ConnectionFactory factory = new ConnectionFactory();
 		factory.setHost("localhost");
 		watchedConnection = factory.newConnection();
 		watchedChannel = watchedConnection.createChannel();
-		watchedChannel.exchangeDeclare(exchangeName, "fanout");
+		watchedChannel.exchangeDeclare(watchedExchange, "fanout");
 		
-		watchedQueue = watchedChannel.queueDeclare().getQueue();
-		watchedChannel.queueBind(watchedQueue, exchangeName, "");
+		String watchedQueue = watchedChannel.queueDeclare().getQueue();
+		logger.info("setting up watched queue '" + watchedQueue + "'");
+		watchedChannel.queueBind(watchedQueue, watchedExchange, "");
 		
 		System.out.println(" [*] Waiting for messages. To exit press CTRL+C");
 		Consumer consumer = new DefaultConsumer(watchedChannel) {
@@ -89,18 +92,18 @@ public class WatchDogService implements Runnable {
 		watchedChannel.basicConsume(watchedQueue, true, consumer);
 	}
 	
-	private void setupNotifiedQueue() throws IOException, TimeoutException {
-		logger.info("setting up notified queue: '" + notificationQueue + "'");
+	public void setupNotifiedQueue() throws IOException, TimeoutException {
+		logger.info("setting up notified queue: '" + notifierExchange + "'");
 		
 		ConnectionFactory factory = new ConnectionFactory();
 		factory.setHost("localhost");
 		
-		notifiedConnection = factory.newConnection();
-		notificationChannel = notifiedConnection.createChannel();
-		notificationChannel.exchangeDeclare(exchangeName, "fanout");
-		notificationChannel.queueBind(notificationQueue, exchangeName, "");
+		notifierConnection = factory.newConnection();
+		notificationChannel = notifierConnection.createChannel();
+		notificationChannel.exchangeDeclare(notifierExchange, "fanout");
+//		notificationChannel.queueBind(notificationQueue, notifierExchange, "");
 		
-		logger.info("notified queue: '" + notificationQueue + "' is now ready.");
+		logger.info("notified queue: '" + notifierExchange + "' is now ready.");
 	}
 	
 	@Override
@@ -109,6 +112,7 @@ public class WatchDogService implements Runnable {
 		while(keepRunning) {
 			if (isTimedOut()) {
 				logger.warn("watch dog timed out!");
+				reset();
 				notifyApp();
 			}
 			try {
@@ -136,7 +140,7 @@ public class WatchDogService implements Runnable {
 		}
 
 		try {
-			notifiedConnection.close();
+			notifierConnection.close();
 		} catch (Exception e) {
 			logger.warn("Exception thrown closing notifiedConnection");
 			logger.info(e + " : msg = " + e.getMessage());
@@ -178,16 +182,16 @@ public class WatchDogService implements Runnable {
 	}
 	
 	public void notifyApp() {
-		logger.info("notifying queue " + notificationQueue);
+		logger.info("notifying app " + notifierExchange);
 	    logger.info(String.format("sending code %s", notificationCode));
-//	    try {
-////			notifiedChannel.basicPublish("", notificationQueue, null, notificationCode);
-//		} catch (IOException e) {
-//			logger.error("Failed to send notification in queue '" + notificationQueue + "'");
-//			logger.error("IO Exception: " + e.getMessage());
-//		} catch (Exception e) {
-//			logger.error("error: " + e.getMessage());
-//		}
+	    try {
+	    	notificationChannel.basicPublish(notifierExchange, "", null, notificationCode);
+		} catch (IOException e) {
+			logger.error("Failed to send notification in queue '" + notifierExchange + "'");
+			logger.error("IO Exception: " + e.getMessage());
+		} catch (Exception e) {
+			logger.error("error: " + e.getMessage());
+		}
 	}
 	
 	public synchronized void handleNewMessage(byte[] msg) {

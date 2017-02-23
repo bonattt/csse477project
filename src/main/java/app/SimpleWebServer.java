@@ -32,7 +32,7 @@ import com.rabbitmq.client.Envelope;
  */
 public class SimpleWebServer {
 	
-	public static final String EXCHANGE = WatchDogService.WATCH_DOG_EXCHANGE;
+	public static final String EXCHANGE = WatchDogService.NOTIFYING_EXCHANGE;
 	
 	private static SimpleWebServer instance;
 	
@@ -48,10 +48,11 @@ public class SimpleWebServer {
 	private String queueName;
 	
 	
-	public static synchronized SimpleWebServer getInstance() {
+	public static synchronized SimpleWebServer getInstance() 
+			throws IOException, TimeoutException {
 		if (instance == null) {
 			instance = new SimpleWebServer();
-			
+			instance.setupMessageReceiving();
 			
 			
 		}
@@ -89,21 +90,31 @@ public class SimpleWebServer {
 			@Override
 			public void handleDelivery(String consumerTag, Envelope envelope,
 						AMQP.BasicProperties properties, byte[] body) throws IOException {
-				String message = new String(body, "UTF-8");
-				logger.info("handling message " + message);
-				if (message.equals(restartKey)) {
-					try {
-						logger.info("rebooting server app");
-						reboot();
-						logger.info("successfully rebooted");
-					} catch (PluginMonitorException e) {
-						logger.error("restart failed!");
-					}
+//				String message = new String(body, "UTF-8");
+//				logger.info("handling message " + message);
+//				if (message.equals(restartKey)) {
+//					try {
+//						logger.info("rebooting server app");
+//						reboot();
+//						logger.info("successfully rebooted");
+//					} catch (PluginMonitorException e) {
+//						logger.error("restart failed!");
+//					}
+//				}
+				try {
+					logger.info("rebooting server app");
+					reboot();
+					logger.info("successfully rebooted");
+				} catch (PluginMonitorException e) {
+					logger.error("restart failed!");
 				}
+				
 			}
 		};
 		channel.basicConsume(queueName, true, consumer);
-		logger.info("message receiving has been setup.");
+		logger.info("message receiving has been setup for");
+		logger.info("queue: '" + queueName + "'");
+		logger.info("exchange: '" + EXCHANGE + "'");
 		messagingSettup = true;
 	}
 
@@ -174,7 +185,7 @@ public class SimpleWebServer {
 	}
 	
 	public static void main(String[] args) 
-			throws IOException, PluginMonitorException {
+			throws IOException, PluginMonitorException, TimeoutException {
 		SimpleWebServer server = getInstance();
 		server.setupServer();
 		server.setupThreads();
