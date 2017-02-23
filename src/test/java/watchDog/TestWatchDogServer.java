@@ -27,12 +27,14 @@ import com.rabbitmq.client.Envelope;
 
 public class TestWatchDogServer {
 
-	private static String watchedQueue = "Watched Queue";
-	private static String notifiedQueue = "Notified Queue";
+//	private static final String WATCHED_QUEUE = "WatchedQueue";
+//	private static final String NOTIFIED_QUEUE = "NotifiedQueue";
 	private static final String DEFAULT_MSG = "nothing received";
+	private static final String EXCHANGE_NAME = WatchDogService.WATCH_DOG_EXCHANGE;
 	
-	private static Channel notifiedChannel, watchedChannel;
-	private static Connection notifiedConnection, watchedConnection;
+	private static String notificationQueue, watchedQueue;
+	private static Channel notificationChannel, watchedChannel;
+	private static Connection notificationConnection, watchedConnection;
 
 	private WatchDogService server;
 	private static String message;
@@ -44,10 +46,11 @@ public class TestWatchDogServer {
 	public void setup() throws IOException, TimeoutException {
 		message = DEFAULT_MSG;
 		messageReceived = false;
+		
 		setupWatchedQueue();
 		setupNotifiedQueue();
 		
-		server = new WatchDogService(notifiedQueue, watchedQueue);
+		server = new WatchDogService(notificationQueue, watchedQueue, EXCHANGE_NAME);
 	}
 	
 	@After
@@ -72,11 +75,70 @@ public class TestWatchDogServer {
 //	}
 	
 	private static void setupWatchedQueue() throws IOException, TimeoutException {
-		logger.warn("setup watched queue unimplemented");
+		ConnectionFactory factory = new ConnectionFactory();
+		factory.setHost("localhost");
+		watchedConnection = factory.newConnection();
+		watchedChannel = watchedConnection.createChannel();
+		watchedChannel.exchangeDeclare(EXCHANGE_NAME, "fanout");
+		watchedQueue = watchedChannel.queueDeclare().getQueue();
 	}
 	
 	private static void setupNotifiedQueue() throws IOException, TimeoutException {
-		logger.warn("setup notified queue unimplemented");
+		logger.info("setting up basic consumer.");
+		ConnectionFactory factory = new ConnectionFactory();
+		factory.setHost("localhost");
+		notificationConnection = factory.newConnection();
+		notificationChannel = notificationConnection.createChannel();
+		notificationChannel.exchangeDeclare(EXCHANGE_NAME, "fanout");
+		
+		notificationQueue = notificationChannel.queueDeclare().getQueue();
+		notificationChannel.queueBind(notificationQueue, EXCHANGE_NAME, "");
+		
+		System.out.println(" [*] Waiting for messages. To exit press CTRL+C");
+		Consumer consumer = new DefaultConsumer(notificationChannel) {
+			@Override
+			public void handleDelivery(String consumerTag, Envelope envelope,
+						AMQP.BasicProperties properties, byte[] body) throws IOException {
+				messageReceived = true;
+				logger.info("handling delivery");
+				message = new String(body, "UTF-8");
+				logger.info("message: '" + message + "'");
+			}
+		};
+		notificationChannel.basicConsume(notificationQueue, true, consumer);
+		logger.info("basic consumer set up");
+	}
+
+//	@Test
+//	public void testHandleNewMessageSetsNewMessageFalse()
+//			throws NoSuchFieldException, SecurityException,
+//				IllegalArgumentException, IllegalAccessException {
+//		Field f = server.getClass().getDeclaredField("newMessageReceived");
+//		f.setAccessible(true);
+//		f.setBoolean(server, true);
+//		
+//		server.handleNewMessage(new byte[]{});
+//		assertFalse(f.getBoolean(server));
+//	}
+	
+	@Test
+	public void testCorrectNotificationQueueName() 
+				throws NoSuchFieldException, SecurityException, 
+					IllegalArgumentException, IllegalAccessException {
+		Field f = server.getClass().getDeclaredField("notificationQueue");
+		f.setAccessible(true);
+		assertNotNull( f.get(server));
+		assertEquals(notificationQueue, f.get(server));
+	}
+	
+	@Test
+	public void testCorrectWatchedQueueName() 
+				throws NoSuchFieldException, SecurityException, 
+					IllegalArgumentException, IllegalAccessException {
+		Field f = server.getClass().getDeclaredField("watchedQueue");
+		f.setAccessible(true);
+		assertNotNull(f.get(server));
+		assertEquals(watchedQueue, f.get(server));
 	}
 	
 	@Test
@@ -160,18 +222,28 @@ public class TestWatchDogServer {
 		assertFalse(server.isTimedOut());
 	}
 
-	@Test(timeout=2000)
-	public void testReceivesNewMessage() throws UnsupportedEncodingException, IOException {
-		String sent = "hello";
-//		watchedChannel.basicPublish("", watchedQueue, null, sent.getBytes("UTF-8"));
-		assertTrue(server.checkForMessages());
-	}
+//	@Test(timeout=2000)
+//	public void testReceivesNewMessage() throws UnsupportedEncodingException, IOException {
+//		String sent = "hello";
+////		watchedChannel.basicPublish("", watchedQueue, null, sent.getBytes("UTF-8"));
+//		assertTrue(server.hasNewMessage());
+//	}
 
-	@Test(timeout=2000)
-	public void testReceivesCorrectMessage() throws UnsupportedEncodingException, IOException {
-		fail("unimplemented");
+	@Test(timeout=2100)
+	public void testReceivesCorrectMessage()
+				throws UnsupportedEncodingException, IOException,
+					IllegalArgumentException, IllegalAccessException,
+					NoSuchFieldException, SecurityException {
+		
 		String sent = "hello";
-//		watchedChannel.basicPublish("", watchedQueue, null, sent.getBytes("UTF-8"));
+		watchedChannel.basicPublish(EXCHANGE_NAME, "", null, sent.getBytes());
+		
+		Field f = server.getClass().getDeclaredField("lastMessage");
+		f.setAccessible(true);
+		try {
+			Thread.sleep(100);
+		} catch (InterruptedException e) {/* do nothing */}
+		assertEquals(sent, f.get(server));
 	}
 	
 	@Test(timeout=2000)
@@ -193,12 +265,12 @@ public class TestWatchDogServer {
 		assertEquals(expected, message);
 	}
 
-	@Test(timeout=2000)
-	public void testNoNewMessages() {
-		assertFalse(server.checkForMessages());
-	}
+//	@Test(timeout=2000)
+//	public void testNoNewMessages() {
+//		assertFalse(server.hasNewMessage());
+//	}
 
-	@Test(timeout=2000)
+	@Test(timeout=2100)
 	public void testReceivingMessageResetsCount()
 				throws NoSuchFieldException, SecurityException, 
 					IllegalArgumentException, IllegalAccessException, 
@@ -206,9 +278,53 @@ public class TestWatchDogServer {
 		Field f = WatchDogService.class.getDeclaredField("count");
 		f.setAccessible(true);
 		f.setInt(server, 10);
+		watchedChannel.basicPublish(EXCHANGE_NAME, "", null, new byte[]{});
+
+		try {
+			Thread.sleep(100);
+		} catch (InterruptedException e) {/* do nothing */}
 		
-//	    watchedChannel.basicPublish("", watchedQueue, null, message.getBytes("UTF-8"));
 	    assertEquals(0, f.getInt(server));
+	}
+	
+	@Test(timeout=2000)
+	public void testHandlingSetsLastMessage()
+				throws NoSuchFieldException, SecurityException, 
+					IllegalArgumentException, IllegalAccessException, 
+					UnsupportedEncodingException, IOException {
+		Field f = WatchDogService.class.getDeclaredField("lastMessage");
+		f.setAccessible(true);
+		server.handleNewMessage("hello".getBytes());
+	    assertEquals("hello", f.get(server));
+	}
+
+	@Test(timeout=2000)
+	public void testHandlingMessageResetsCount()
+				throws NoSuchFieldException, SecurityException, 
+					IllegalArgumentException, IllegalAccessException, 
+					UnsupportedEncodingException, IOException {
+		Field f = WatchDogService.class.getDeclaredField("count");
+		f.setAccessible(true);
+		f.setInt(server, 10);
+		server.handleNewMessage(new byte[]{});
+	    assertEquals(0, f.getInt(server));
+	}
+
+	@Test(timeout=2000)
+	public void testTimeoutTriggersMessage() {
+		server.setTimeLimit(300);
+		Thread t = new Thread(server);
+		t.start();
+		while(! messageReceived) { /* busy wait */ }
+		// message was received, test should pass.
+	}
+
+	@Test(timeout=2000)
+	public void testSendsCorrectCode() {
+		byte[] sent = "hello".getBytes();
+		server.setNotificationCode(sent);
+		server.notifyApp();
+		assertEquals(sent, message.getBytes());
 	}
 
 }

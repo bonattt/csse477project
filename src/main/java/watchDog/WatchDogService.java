@@ -4,6 +4,7 @@ import iServer.IServer;
 import iServer.IServlet;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -20,33 +21,35 @@ import com.rabbitmq.client.Envelope;
 
 public class WatchDogService implements Runnable {
 
+	public static final String WATCH_DOG_EXCHANGE = "watchDogExchange";
+	
 	private static final int WAIT_TIME = 100;
 	private static final int DEFAULT_TICKS = 100;
 	private static final byte[] DEFAULT_CODE = new byte[]{'a', 'b', 'c', 1, 2, 3};
 
 	private int count, maxCount; 
-	private String notificationQueue, watchedQueue;
+	private String notificationQueue, watchedQueue, exchangeName;
 	private boolean keepRunning;
 
-	private Channel notifiedChannel, watchedChannel;
+	private Channel notificationChannel, watchedChannel;
 	private Connection notifiedConnection, watchedConnection;
 	
-	private String message;
-	private boolean messageReceived;
+	private String lastMessage;
 	
 	private byte[] notificationCode;
 	
 	private Logger logger = LogManager.getLogger(this.getClass());
 	
-	public WatchDogService(String notifiedQueue, String watchedQueue)
+	public WatchDogService(String notifiedQueue, String watchedQueue, String exchangeName)
 				throws IOException, TimeoutException {
-		this(notifiedQueue, watchedQueue, WAIT_TIME * DEFAULT_TICKS);
+		this(notifiedQueue, watchedQueue, exchangeName, WAIT_TIME * DEFAULT_TICKS);
 	}
 	
-	protected WatchDogService(String notifyQueue, String checkQueue, int milis) 
+	protected WatchDogService(String notifyQueue, String checkQueue, String exchangeName, int milis) 
 				throws IOException, TimeoutException {
 		this.notificationQueue = notifyQueue;
 		this.watchedQueue = checkQueue;
+		this.exchangeName = exchangeName;
 		this.notificationCode = DEFAULT_CODE;
 		this.keepRunning = true;
 		
@@ -66,20 +69,44 @@ public class WatchDogService implements Runnable {
 	
 	private void setupWatchedQueue() throws IOException, TimeoutException {
 		logger.info("setting up watched queue + '" + watchedQueue + "'");
-		logger.warn("this method is not implemented yet");
+		ConnectionFactory factory = new ConnectionFactory();
+		factory.setHost("localhost");
+		watchedConnection = factory.newConnection();
+		watchedChannel = watchedConnection.createChannel();
+		watchedChannel.exchangeDeclare(exchangeName, "fanout");
+		
+		watchedQueue = watchedChannel.queueDeclare().getQueue();
+		watchedChannel.queueBind(watchedQueue, exchangeName, "");
+		
+		System.out.println(" [*] Waiting for messages. To exit press CTRL+C");
+		Consumer consumer = new DefaultConsumer(watchedChannel) {
+			@Override
+			public void handleDelivery(String consumerTag, Envelope envelope,
+						AMQP.BasicProperties properties, byte[] body) throws IOException {
+				handleNewMessage(body);
+			}
+		};
+		watchedChannel.basicConsume(watchedQueue, true, consumer);
 	}
 	
 	private void setupNotifiedQueue() throws IOException, TimeoutException {
 		logger.info("setting up notified queue: '" + notificationQueue + "'");
-		logger.warn("this method is not implemented yet");
-		logger.info("notified queue: '" + notificationQueue + "' is now consuming messages.");
+		ConnectionFactory factory = new ConnectionFactory();
+		factory.setHost("localhost");
+		notifiedConnection = factory.newConnection();
+		notificationChannel = notifiedConnection.createChannel();
+		notificationChannel.exchangeDeclare(exchangeName, "fanout");
+		
+		notificationChannel.queueBind(notificationQueue, exchangeName, "");
+		
+		
+		logger.info("notified queue: '" + notificationQueue + "' is now ready.");
 	}
 	
 	@Override
 	public void run() {
 		logger.info("starting WatchDogServer");
 		while(keepRunning) {
-			checkForMessages();
 			if (isTimedOut()) {
 				logger.warn("watch dog timed out!");
 				notifyApp();
@@ -90,12 +117,12 @@ public class WatchDogService implements Runnable {
 			tick();
 		}
 		logger.info("WatchDogServer finished");
-//		closeAll();
+		closeAll();
 	}
 
 	private void closeAll() {
 		try {
-			notifiedChannel.close();
+			notificationChannel.close();
 		} catch (Exception e) {
 			logger.warn("Exception thrown closing notifiedChannel");
 			logger.info(e + " : msg = " + e.getMessage());
@@ -163,9 +190,14 @@ public class WatchDogService implements Runnable {
 //		}
 	}
 	
-	public boolean checkForMessages() {
-		logger.info("checking for messages from " + watchedQueue);
-		return false;
+	public synchronized void handleNewMessage(byte[] msg) {
+		try {
+			lastMessage = new String(msg, "UTF-8");
+		} catch (UnsupportedEncodingException e) {
+			logger.error("UTF-8 encoding not supported");
+			lastMessage = "utf-8 not supported";
+		}
+		count = 0;
 	}
 	
 	public synchronized void tick() {
